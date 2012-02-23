@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+	http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
+
+	<bean id="indexWorker"
+		class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor"
+		scope="prototype">
+		<property name="corePoolSize" value="1" />
+		<property name="maxPoolSize" value="1" />
+		<property name="threadNamePrefix" value="index-" />
+	</bean>
+
+	<bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource"
+		destroy-method="close">
+		<property name="driverClass" value="com.mysql.jdbc.Driver" />
+		<property name="jdbcUrl"
+			value="jdbc:mysql://localhost:3306/redis?user=root&amp;password=root&amp;useUnicode=true&amp;characterEncoding=gbk" />
+		<property name="initialPoolSize">
+			<value>10</value>
+		</property>
+		<property name="minPoolSize">
+			<value>5</value>
+		</property>
+		<property name="maxPoolSize">
+			<value>30</value>
+		</property>
+		<property name="acquireIncrement">
+			<value>5</value>
+		</property>
+		<property name="maxIdleTime">
+			<value>10</value>
+		</property>
+		<property name="maxStatements">
+			<value>0</value>
+		</property>
+	</bean>
+
+	<bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
+		<property name="dataSource">
+			<ref bean="dataSource" />
+		</property>
+	</bean>
+
+	<bean id="searchService" class="bma.search.engine.impl.SearchServiceImpl"
+		destroy-method="close">
+		<property name="indexExecutor" ref="indexWorker" />
+		<property name="file"
+			value="D:/workroom/duowan/project/workspace/engine/target/test_index" />
+		<property name="dicHome"
+			value="D:/workroom/duowan/project/workspace/engine/dic" />
+		<property name="dataSourceList">
+			<list>
+				<bean class="bma.search.engine.impl.DemoIndexDataSource">
+					<property name="id" value="demo" />
+					<property name="jdbcTemplate" ref="jdbcTemplate" />
+				</bean>
+			</list>
+		</property>
+		<property name="searchBuilder">
+			<bean class="bma.search.engine.impl.DemoSearchBuilder">
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="server" class="bma.search.engine.boot.ThriftServerConfig">
+		<property name="port" value="1234" />
+		<property name="service" ref="searchService" />
+	</bean>
+
+	<bean id="timer1" class="org.springframework.scheduling.timer.ScheduledTimerTask">
+		<property name="timerTask">
+			<bean class="bma.search.engine.boot.IndexTimer">
+				<property name="service" ref="searchService" />
+			</bean>
+		</property>
+		<property name="period" value="3600000" />
+		<property name="delay" value="60000" />
+	</bean>
+	<bean class="org.springframework.scheduling.timer.TimerFactoryBean">
+		<property name="scheduledTimerTasks">
+			<list>
+				<ref bean="timer1"></ref>
+			</list>
+		</property>
+	</bean>
+
+</beans>
